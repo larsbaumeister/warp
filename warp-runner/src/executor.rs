@@ -20,20 +20,42 @@ pub fn execute(target: &Path) -> io::Result<i32> {
 }
 
 #[cfg(target_family = "unix")]
-fn ensure_executable(target: &Path) {
-    let perms = Permissions::from_mode(0o770);
-    fs::set_permissions(target, perms).unwrap();
+fn ensure_executable(target: &Path) -> io::Result<()> {
+    add_exec_permission(target, true, true, false)?;
+    Ok(())
+}
+
+#[cfg(target_family = "unix")]
+fn add_exec_permission(file: &Path, user: bool, group: bool, other: bool) -> io::Result<()> {
+    let permissions = file.metadata()?.permissions();
+    let mode = permissions.mode();
+
+    let mut new_mode = mode;
+    if user {
+        new_mode |= 1 << 6;
+    }
+    if group {
+        new_mode |= 1 << 3;
+    }
+    if other {
+        new_mode |= 1
+    }
+
+    fs::set_permissions(file, Permissions::from_mode(new_mode))?;
+
+    Ok(())
 }
 
 #[cfg(target_family = "unix")]
 fn do_execute(target: &Path, args: &[String]) -> io::Result<i32> {
-    ensure_executable(target);
+    ensure_executable(target)?;
 
     Ok(Command::new(target)
         .args(args)
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
+        .env("WARP_EXEC_PATH", env::current_exe()?.as_os_str())
         .spawn()?
         .wait()?
         .code().unwrap_or(1))
@@ -64,6 +86,7 @@ fn do_execute(target: &Path, args: &[String]) -> io::Result<i32> {
             .stdin(Stdio::inherit())
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
+            .env("WARP_EXEC_PATH", env::current_exe()?)
             .spawn()?
             .wait()?
             .code().unwrap_or(1))
@@ -73,6 +96,7 @@ fn do_execute(target: &Path, args: &[String]) -> io::Result<i32> {
             .stdin(Stdio::inherit())
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
+            .env("WARP_EXEC_PATH", env::current_exe()?)
             .spawn()?
             .wait()?
             .code().unwrap_or(1))
