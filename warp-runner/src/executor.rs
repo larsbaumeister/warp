@@ -55,7 +55,7 @@ fn do_execute(target: &Path, args: &[String]) -> io::Result<i32> {
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
-        .env("WARP_EXEC_PATH", env::current_exe()?.as_os_str())
+        .env("WARP_EXEC_PATH", env::current_exe()?)
         .spawn()?
         .wait()?
         .code().unwrap_or(1))
