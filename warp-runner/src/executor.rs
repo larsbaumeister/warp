@@ -72,6 +72,16 @@ fn is_script(target: &Path) -> bool {
 }
 
 #[cfg(target_family = "windows")]
+fn is_vbs(target: &Path) -> bool {
+    const VBS_EXTENSIONS: &[&str] = &["vbs"];
+    VBS_EXTENSIONS.contains(
+        &target.extension()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_lowercase().as_str())
+}
+
+#[cfg(target_family = "windows")]
 fn do_execute(target: &Path, args: &[String]) -> io::Result<i32> {
     let target_str = target.as_os_str().to_str().unwrap();
 
@@ -82,6 +92,21 @@ fn do_execute(target: &Path, args: &[String]) -> io::Result<i32> {
         cmd_args.extend_from_slice(&args);
 
         Ok(Command::new("cmd")
+            .args(cmd_args)
+            .stdin(Stdio::inherit())
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .env("WARP_EXEC_PATH", env::current_exe()?)
+            .spawn()?
+            .wait()?
+            .code().unwrap_or(1))
+    } else if is_vbs(target) {
+        let mut cmd_args = Vec::with_capacity(args.len() + 2);
+        cmd_args.push("/nologo".to_string());
+        cmd_args.push(target_str.to_string());
+        cmd_args.extend_from_slice(&args);
+
+        Ok(Command::new("wscript")
             .args(cmd_args)
             .stdin(Stdio::inherit())
             .stdout(Stdio::inherit())
